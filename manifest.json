@@ -2,7 +2,7 @@
   "name": "GymTracker",
   "short_name": "GymTracker",
   "description": "Tu app de entrenamiento personal",
-  "start_url": "/",
+  "start_url": "/noahpg/",
   "display": "standalone",
   "background_color": "#f2f0ed",
   "theme_color": "#e8460a",
