@@ -1,2 +1,0 @@
-# noahpg
-GymTracker
