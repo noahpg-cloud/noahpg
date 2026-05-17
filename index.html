@@ -155,10 +155,20 @@
     </div>
   </div>
   <div class="rest-presets">
-    <button class="rest-preset" onclick="setRestTime(60)">60s</button>
-    <button class="rest-preset active" onclick="setRestTime(90)">90s</button>
-    <button class="rest-preset" onclick="setRestTime(120)">2min</button>
-    <button class="rest-preset" onclick="setRestTime(180)">3min</button>
+    <button class="rest-preset" data-secs="60" onclick="setRestTime(60)">60s</button>
+    <button class="rest-preset active" data-secs="90" onclick="setRestTime(90)">90s</button>
+    <button class="rest-preset" data-secs="120" onclick="setRestTime(120)">2min</button>
+    <button class="rest-preset" data-secs="180" onclick="setRestTime(180)">3min</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+    <input id="rest-custom-input" type="number" value="90" min="5" max="600"
+      style="width:80px;text-align:center;background:rgba(255,255,255,.12);
+             border:0.5px solid rgba(255,255,255,.25);border-radius:8px;
+             color:#fff;font-size:15px;padding:7px 8px"
+      placeholder="seg"
+      onchange="setRestTimeFromInput()"
+      onkeydown="if(event.key==='Enter'){this.blur();setRestTimeFromInput()}">
+    <span style="font-size:12px;color:rgba(255,255,255,.5)">seg (o min si ≤20)</span>
   </div>
   <div class="rest-btns">
     <button class="rest-btn" onclick="addRestTime(15)">+15s</button>
@@ -366,11 +376,15 @@
 <script>
   // Iniciar la app cargando los datos
   load();
+  // Request notification permission for rest timer alerts
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => requestNotifPermission(), 2000);
+  }
 </script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
     });
   }
 </script>
