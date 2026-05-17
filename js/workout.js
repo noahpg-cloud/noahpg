@@ -326,10 +326,13 @@ function setRestTime(secs){
 function setRestTimeFromInput(){
   const ci = document.getElementById('rest-custom-input');
   if (!ci) return;
-  let val = parseInt(ci.value);
+  const raw = ci.value.trim();
+  if (raw === '') return;
+  let val = parseInt(raw);
   if (isNaN(val) || val < 5) { ci.value = restTotal; return; }
-  // If user types >20 assume seconds, else assume minutes
   if (val <= 20) val = val * 60;
+  val = Math.min(val, 600);
+  ci.value = val;
   setRestTime(val);
 }
 
