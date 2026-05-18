@@ -296,8 +296,8 @@ function updateRestDisplay(){
     const val = parseInt(b.dataset.secs || b.textContent);
     b.classList.toggle('active', val === restTotal);
   });
-  // Sync custom input if exists
-  const ci = document.getElementById('rest-custom-input');
+  // Sync custom  if exists
+  const ci = document.getElementById('rest-custom-');
   if (ci && document.activeElement !== ci) ci.value = restTotal;
 }
 
@@ -329,8 +329,8 @@ function setRestTimeFromInput(){
   const raw = ci.value.trim();
   if (raw === '') return;
   let val = parseInt(raw);
-  if (isNaN(val) || val < 15) { ci.value = restTotal; return; }
-  if (val <= 15) val = val * 60;
+  if (isNaN(val) || val <= 15) { ci.value = restTotal; return; }
+  if (val < 15) val = val * 60;
   val = Math.min(val, 600);
   ci.value = val;
   setRestTime(val);
