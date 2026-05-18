@@ -93,7 +93,11 @@
   </div>
   <div class="cnt">
     <div class="card">
-      <div style="font-size:13px;color:var(--t2);margin-bottom:12px;font-weight:500">🤖 API del Trainer IA</div>
+      <div style="font-size:13px;color:var(--t2);margin-bottom:8px;font-weight:500">🎨 Tema de color</div>
+      <div id="theme-picker" class="theme-swatches"></div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:12px;font-weight:500">🤖 API del Trainer</div>
       <p style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:10px">
         Necesitas una API key para usar el chat y generar rutinas con IA.<br>
         <strong>Gemini</strong> tiene tier gratuito permanente (sin tarjeta).
@@ -166,9 +170,9 @@
              border:0.5px solid rgba(255,255,255,.25);border-radius:8px;
              color:#fff;font-size:15px;padding:7px 8px"
       placeholder="seg"
+      onchange="setRestTimeFromInput()"
       onkeydown="if(event.key==='Enter'){this.blur();setRestTimeFromInput()}">
-    <button class="rest-btn" onclick="setRestTimeFromInput()" style="padding:7px 12px;font-size:13px">OK</button>
-    <span style="font-size:12px;color:rgba(255,255,255,.5)">min 20s</span>
+    <span style="font-size:12px;color:rgba(255,255,255,.5)">seg (o min si ≤20)</span>
   </div>
   <div class="rest-btns">
     <button class="rest-btn" onclick="addRestTime(15)">+15s</button>
@@ -202,7 +206,7 @@
     <div class="menu-item" id="mi-home" onclick="goTo('s-home','mi-home')"><i class="ti ti-home"></i>Inicio</div>
     <div class="menu-item" id="mi-progress" onclick="goTo('s-progress','mi-progress');renderProgressSelect()"><i class="ti ti-chart-line"></i>Progreso</div>
     <div class="menu-item" id="mi-chat" onclick="goTo('s-chat','mi-chat')"><i class="ti ti-robot"></i>Trainer AI</div>
-    <div class="menu-item" id="mi-settings" onclick="goTo('s-settings','mi-settings');initApiConfigUI()"><i class="ti ti-settings"></i>Ajustes</div>
+    <div class="menu-item" id="mi-settings" onclick="goTo('s-settings','mi-settings');initApiConfigUI();renderThemePicker()"><i class="ti ti-settings"></i>Ajustes</div>
   </div>
 </div>
 
@@ -376,6 +380,7 @@
 <script>
   // Iniciar la app cargando los datos
   load();
+  renderThemePicker();
   // Request notification permission for rest timer alerts
   if ('Notification' in window && Notification.permission === 'default') {
     setTimeout(() => requestNotifPermission(), 2000);
