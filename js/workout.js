@@ -330,7 +330,7 @@ function setRestTimeFromInput(){
   if (raw === '') return;
   let val = parseInt(raw);
   if (isNaN(val) || val < 5) { ci.value = restTotal; return; }
-  if (val <= 20) val = val * 60;
+  if (val < 15) val = val * 60;
   val = Math.min(val, 600);
   ci.value = val;
   setRestTime(val);
