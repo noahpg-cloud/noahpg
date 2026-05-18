@@ -1,5 +1,5 @@
 // ---- STATE ----
-let S = {routines:[], sessions:[], chatHistory:[], pausedWorkout:null, apiConfig:{provider:'openrouter', key:''}, profile:{name:'', weight:'', height:'', age:'', sex:'male', bf:'', activity:'moderate', intensity:'medium', steps:'', goal:'hypertrophy', goalWeight:'', goalNote:''}};
+let S = {routines:[], sessions:[], chatHistory:[], pausedWorkout:null, theme:'default', apiConfig:{provider:'openrouter', key:''}, profile:{name:'', weight:'', height:'', age:'', sex:'male', bf:'', activity:'moderate', intensity:'medium', steps:'', goal:'hypertrophy', goalWeight:'', goalNote:''}};
 let editRoutineId = null;
 let rutineExercises = [];
 let workout = null;
@@ -11,7 +11,9 @@ let deleteSessionConfirmId = null;
 async function load(){
   try{
     const data = localStorage.getItem('gmt2');
-    if(data){ S = JSON.parse(data); if(!S.pausedWorkout) S.pausedWorkout=null; if(!S.chatHistory) S.chatHistory=[]; if(!S.apiConfig) S.apiConfig={provider:'openrouter', key:''}; if(!S.profile) S.profile={name:'',weight:'',height:'',age:'',sex:'male',bf:'',activity:'moderate',intensity:'medium',steps:'',goal:'hypertrophy',goalWeight:'',goalNote:''}; }
+    if(data){ S = JSON.parse(data); if(!S.pausedWorkout) S.pausedWorkout=null; if(!S.chatHistory) S.chatHistory=[]; if(!S.apiConfig) S.apiConfig={provider:'openrouter', key:''}; if(!S.profile) S.profile={name:'',weight:'',height:'',age:'',sex:'male',bf:'',activity:'moderate',intensity:'medium',steps:'',goal:'hypertrophy',goalWeight:'',goalNote:''};
+    if(!S.theme) S.theme='default';
+    applyTheme(S.theme); }
   }catch(e){}
   renderHome(); renderProgressSelect();
 }
@@ -59,6 +61,40 @@ function clearAllData(){
   save(); renderHome(); renderProgressSelect();
   alert('Datos borrados correctamente.');
 }
+// ---- THEME ----
+const THEMES = {
+  default: { name:'Naranja',  color:'#e8460a', icon:'🔥' },
+  ocean:   { name:'Océano',   color:'#0369a1', icon:'🌊' },
+  forest:  { name:'Bosque',   color:'#166534', icon:'🌿' },
+  purple:  { name:'Morado',   color:'#7c3aed', icon:'🔮' }
+};
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme === 'default' ? '' : theme);
+  S.theme = theme;
+  // Update swatch active state
+  document.querySelectorAll('.theme-swatch').forEach(el => {
+    el.classList.toggle('active', el.dataset.theme === theme);
+  });
+}
+
+function setTheme(theme) {
+  applyTheme(theme);
+  save();
+}
+
+function renderThemePicker() {
+  const wrap = document.getElementById('theme-picker');
+  if (!wrap) return;
+  wrap.innerHTML = Object.entries(THEMES).map(([key, t]) => `
+    <div class="theme-swatch ${S.theme === key ? 'active' : ''}"
+         data-theme="${key}"
+         style="background:${t.color}"
+         onclick="setTheme('${key}')">
+      ${S.theme === key ? '<i class="ti ti-check"></i>' : t.icon}
+    </div>`).join('');
+}
+
 // ---- API CONFIG ----
 function saveApiConfig() {
   const provider = document.getElementById('api-provider')?.value || 'gemini';
