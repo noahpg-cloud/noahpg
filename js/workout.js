@@ -50,9 +50,16 @@ function renderWorkout(){
   cnt.innerHTML = `
     <div style="font-size:12px;color:var(--t2);margin-bottom:10px">Ejercicio ${exIdx+1} de ${totalEx}</div>
     <div class="ex-card-big">
-      <div class="ex-name-big">${curEx.name}</div>
-      ${curEx.machineConfig ? `<div style="font-size:12px;color:var(--t3);margin-bottom:6px">⚙️ ${curEx.machineConfig}</div>` : ''}
-      <div class="set-progress">Serie ${setIdx+1} de ${totalSets}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div class="ex-name-big">${curEx.name}</div>
+          ${curEx.machineConfig ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">⚙️ ${curEx.machineConfig}</div>` : ''}
+        </div>
+        <button class="btn xs ghost" style="margin-top:4px;flex-shrink:0" onclick="openEditExercise(${exIdx})">
+          <i class="ti ti-edit"></i>
+        </button>
+      </div>
+      <div class="set-progress" style="margin-top:6px">Serie ${setIdx+1} de ${totalSets}</div>
       <div class="set-inputs">
         <div class="set-inp-wrap">
           <div class="set-inp-label">Peso (kg)</div>
@@ -71,6 +78,52 @@ function renderWorkout(){
     ${upcomingHtml}
     <button class="btn full" style="margin-top:6px;color:var(--t2)" onclick="skipExercise()"><i class="ti ti-player-skip-forward"></i> Saltar ejercicio</button>
   `;
+}
+
+function openEditExercise(idx) {
+  const ex = workout.log[idx];
+  // Build inline edit panel replacing the card temporarily
+  const panel = document.getElementById('wk-edit-panel');
+  if (panel) { panel.remove(); return; } // toggle off
+
+  const div = document.createElement('div');
+  div.id = 'wk-edit-panel';
+  div.style.cssText = 'position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;background:var(--bg);border-top:0.5px solid var(--bd);border-radius:16px 16px 0 0;padding:16px;z-index:80;box-shadow:0 -4px 20px rgba(0,0,0,.12)';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:14px;font-weight:500">Editar ejercicio</span>
+      <button class="btn xs ghost" onclick="document.getElementById('wk-edit-panel').remove()"><i class="ti ti-x"></i></button>
+    </div>
+    <label class="lbl">Nombre</label>
+    <input type="text" id="wk-edit-name" value="${esc(ex.name)}" style="margin-bottom:8px">
+    <label class="lbl">⚙️ Config. máquina (opcional)</label>
+    <input type="text" id="wk-edit-config" value="${esc(ex.machineConfig||'')}" placeholder="Asiento, apoyo, altura...">
+    <button class="btn ac full" style="margin-top:12px" onclick="saveEditExercise(${idx})">
+      <i class="ti ti-device-floppy"></i> Guardar
+    </button>`;
+  document.body.appendChild(div);
+}
+
+function saveEditExercise(idx) {
+  const name   = document.getElementById('wk-edit-name')?.value.trim();
+  const config = document.getElementById('wk-edit-config')?.value.trim();
+  if (!name) return;
+
+  // Update log
+  workout.log[idx].name = name;
+  workout.log[idx].machineConfig = config;
+
+  // Update original routine
+  const routine = S.routines.find(r => r.id === workout.routineId);
+  if (routine && routine.exercises[idx]) {
+    routine.exercises[idx].name = name;
+    routine.exercises[idx].machineConfig = config;
+    save();
+  }
+
+  document.getElementById('wk-edit-panel')?.remove();
+  renderWorkout();
+  showToast('✓ Ejercicio actualizado');
 }
 
 function completeSet(hit){
@@ -205,59 +258,131 @@ function confirmSetMiss(){ cancelConfirm(); completeSet(false); }
 let restTimer = null;
 let restTotal = 90;
 let restLeft = 90;
+let restStartedAt = null;
+let restNotifId = null;
 const REST_CIRC = 515;
+
+function playRestEndSound(){
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.22, 0.44].forEach(offset => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine'; osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0, ctx.currentTime + offset);
+      gain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + offset + 0.02);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + offset + 0.18);
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + 0.2);
+    });
+  } catch(e){}
+}
+
+async function requestNotifPermission(){
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') await Notification.requestPermission();
+}
+
+function scheduleRestNotif(secs, nextLabel){
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (restNotifId) { clearTimeout(restNotifId); restNotifId = null; }
+  restNotifId = setTimeout(() => {
+    new Notification('¡Descanso terminado!', {
+      body: nextLabel || 'Es hora de la siguiente serie',
+      icon: './icon-192.png', silent: false
+    });
+  }, secs * 1000);
+}
+
+function cancelRestNotif(){
+  if (restNotifId) { clearTimeout(restNotifId); restNotifId = null; }
+}
+
+function handleVisibilityChange(){
+  if (document.visibilityState === 'visible' && restStartedAt !== null) {
+    const elapsed = Math.floor((Date.now() - restStartedAt) / 1000);
+    restLeft = Math.max(0, restTotal - elapsed);
+    updateRestDisplay();
+    if (restLeft <= 0) { clearInterval(restTimer); restStartedAt = null; onRestEnd(); }
+  }
+}
+document.addEventListener('visibilitychange', handleVisibilityChange);
+
+function onRestEnd(){
+  playRestEndSound();
+  if(navigator.vibrate) navigator.vibrate([100,50,100,50,100]);
+  cancelRestNotif();
+  setTimeout(()=>{ document.getElementById('rest-overlay').classList.remove('on'); }, 400);
+}
 
 function startRest(nextLabel){
   clearInterval(restTimer);
   restLeft = restTotal;
+  restStartedAt = Date.now();
   updateRestDisplay();
   document.getElementById('rest-next-label').textContent = nextLabel || '';
   document.getElementById('rest-overlay').classList.add('on');
   if(navigator.vibrate) navigator.vibrate(200);
+  scheduleRestNotif(restTotal, nextLabel);
   restTimer = setInterval(()=>{
     restLeft--;
     updateRestDisplay();
-    if(restLeft <= 0){
-      clearInterval(restTimer);
-      if(navigator.vibrate) navigator.vibrate([100,50,100]);
-      setTimeout(()=>{ document.getElementById('rest-overlay').classList.remove('on'); }, 400);
-    }
+    if(restLeft <= 0){ clearInterval(restTimer); restStartedAt = null; onRestEnd(); }
   }, 1000);
 }
 
 function updateRestDisplay(){
   document.getElementById('rest-num').textContent = restLeft;
   const pct = restLeft / restTotal;
-  const offset = REST_CIRC * (1 - pct);
-  document.getElementById('rest-arc').style.strokeDashoffset = offset;
-  document.querySelectorAll('.rest-preset').forEach(b=>{
-    b.classList.toggle('active', parseInt(b.textContent) === restTotal || (b.textContent==='2min'&&restTotal===120) || (b.textContent==='3min'&&restTotal===180));
+  document.getElementById('rest-arc').style.strokeDashoffset = REST_CIRC * (1 - pct);
+  document.querySelectorAll('.rest-preset').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.secs || b.textContent) === restTotal);
   });
+  const ci = document.getElementById('rest-custom-input');
+  if (ci && document.activeElement !== ci) ci.value = restTotal;
 }
 
 function setRestTime(secs){
-  restTotal = secs;
-  restLeft = secs;
-  clearInterval(restTimer);
+  secs = Math.max(15, Math.min(secs, 600));
+  restTotal = secs; restLeft = secs;
+  restStartedAt = Date.now();
+  clearInterval(restTimer); cancelRestNotif();
   updateRestDisplay();
+  const label = document.getElementById('rest-next-label')?.textContent || '';
+  scheduleRestNotif(secs, label);
   restTimer = setInterval(()=>{
     restLeft--;
     updateRestDisplay();
-    if(restLeft <= 0){
-      clearInterval(restTimer);
-      if(navigator.vibrate) navigator.vibrate([100,50,100]);
-      setTimeout(()=>{ document.getElementById('rest-overlay').classList.remove('on'); }, 400);
-    }
+    if(restLeft <= 0){ clearInterval(restTimer); restStartedAt = null; onRestEnd(); }
   }, 1000);
+}
+
+function setRestTimeFromInput(){
+  const ci = document.getElementById('rest-custom-input');
+  if (!ci) return;
+  const raw = ci.value.trim();
+  if (raw === '') return;
+  let val = parseInt(raw);
+  if (isNaN(val) || val < 15) { ci.value = restTotal; return; }
+  if (val <= 15) val = val * 60;
+  val = Math.min(val, 600);
+  ci.value = val;
+  setRestTime(val);
 }
 
 function addRestTime(secs){
   restLeft = Math.min(restLeft + secs, 600);
   restTotal = Math.max(restTotal, restLeft);
+  restStartedAt = Date.now() - ((restTotal - restLeft) * 1000);
+  cancelRestNotif();
+  const label = document.getElementById('rest-next-label')?.textContent || '';
+  scheduleRestNotif(restLeft, label);
   updateRestDisplay();
 }
 
 function skipRest(){
-  clearInterval(restTimer);
+  clearInterval(restTimer); cancelRestNotif();
+  restStartedAt = null;
   document.getElementById('rest-overlay').classList.remove('on');
 }
