@@ -50,15 +50,13 @@ function renderWorkout(){
   cnt.innerHTML = `
     <div style="font-size:12px;color:var(--t2);margin-bottom:10px">Ejercicio ${exIdx+1} de ${totalEx}</div>
     <div class="ex-card-big">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-        <div style="flex:1;min-width:0">
-          <div class="ex-name-big">${curEx.name}</div>
-          ${curEx.machineConfig ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">⚙️ ${curEx.machineConfig}</div>` : ''}
-        </div>
-        <button class="btn xs ghost" style="margin-top:4px;flex-shrink:0" onclick="openEditExercise(${exIdx})">
-          <i class="ti ti-edit"></i>
-        </button>
-      </div>
+     <div style="position:relative">
+  <div class="ex-name-big">${curEx.name}</div>
+  ${curEx.machineConfig ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">⚙️ ${curEx.machineConfig}</div>` : ''}
+  <button class="btn xs ghost" style="position:absolute;top:0;right:0" onclick="openEditExercise(${exIdx})">
+    <i class="ti ti-edit"></i>
+  </button>
+</div>
       <div class="set-progress" style="margin-top:6px">Serie ${setIdx+1} de ${totalSets}</div>
       <div class="set-inputs">
         <div class="set-inp-wrap">
