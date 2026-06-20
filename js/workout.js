@@ -4,7 +4,7 @@ function startWorkout(rid){
   workout = {
     routineId: rid, routineName: r.name,
     exIdx: 0, setIdx: 0,
-    log: r.exercises.map(e=>({name:e.name, sets: e.sets.map(s=>({kg:s.kg||'',reps:s.reps||'', done:false, hit:null}))})),
+    log: r.exercises.map(e=>({name:e.name, machineConfig:e.machineConfig||'', sets: e.sets.map(s=>({kg:s.kg||'',reps:s.reps||'', done:false, hit:null}))})),
     startTime: Date.now()
   };
   wkSeconds = 0;
@@ -51,6 +51,7 @@ function renderWorkout(){
     <div style="font-size:12px;color:var(--t2);margin-bottom:10px">Ejercicio ${exIdx+1} de ${totalEx}</div>
     <div class="ex-card-big">
       <div class="ex-name-big">${curEx.name}</div>
+      ${curEx.machineConfig ? `<div style="font-size:12px;color:var(--t3);margin-bottom:6px">⚙️ ${curEx.machineConfig}</div>` : ''}
       <div class="set-progress">Serie ${setIdx+1} de ${totalSets}</div>
       <div class="set-inputs">
         <div class="set-inp-wrap">
@@ -99,7 +100,17 @@ function completeSet(hit){
 }
 
 function skipExercise(){
-  workout.exIdx++; workout.setIdx = 0;
+  if(!workout) return;
+  // Mark remaining sets of current exercise as skipped
+  const curEx = workout.log[workout.exIdx];
+  for(let i = workout.setIdx; i < curEx.sets.length; i++){
+    curEx.sets[i].done = false;
+    curEx.sets[i].hit = null;
+  }
+  workout.exIdx++;
+  workout.setIdx = 0;
+  // Close rest overlay if open
+  skipRest();
   renderWorkout();
 }
 
@@ -121,7 +132,7 @@ function showWorkoutComplete(){
   workout = null;
 }
 
-function confirmExitWorkout(){ openModal('modal-exit'); }
+function confirmExitWorkout(){ skipRest(); openModal('modal-exit'); }
 
 function pauseWorkout(){
   clearInterval(wkTimer);
@@ -194,94 +205,22 @@ function confirmSetMiss(){ cancelConfirm(); completeSet(false); }
 let restTimer = null;
 let restTotal = 90;
 let restLeft = 90;
-let restStartedAt = null;   // real clock when rest started (for screen-lock compensation)
-let restNotifId = null;
 const REST_CIRC = 515;
-
-// ---- Sound (beep via AudioContext, no files needed) ----
-function playRestEndSound(){
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const beeps = [0, 0.22, 0.44];
-    beeps.forEach(offset => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0, ctx.currentTime + offset);
-      gain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + offset + 0.02);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + offset + 0.18);
-      osc.start(ctx.currentTime + offset);
-      osc.stop(ctx.currentTime + offset + 0.2);
-    });
-  } catch(e){}
-}
-
-// ---- Notifications ----
-async function requestNotifPermission(){
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    await Notification.requestPermission();
-  }
-}
-
-function scheduleRestNotif(secs, nextLabel){
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  // Cancel any previous
-  if (restNotifId) { clearTimeout(restNotifId); restNotifId = null; }
-  restNotifId = setTimeout(() => {
-    new Notification('¡Descanso terminado!', {
-      body: nextLabel || 'Es hora de la siguiente serie',
-      icon: './icon-192.png',
-      badge: './icon-192.png',
-      silent: false
-    });
-  }, secs * 1000);
-}
-
-function cancelRestNotif(){
-  if (restNotifId) { clearTimeout(restNotifId); restNotifId = null; }
-}
-
-// ---- Visibility change: compensate for screen lock ----
-function handleVisibilityChange(){
-  if (document.visibilityState === 'visible' && restStartedAt !== null) {
-    const elapsed = Math.floor((Date.now() - restStartedAt) / 1000);
-    restLeft = Math.max(0, restTotal - elapsed);
-    updateRestDisplay();
-    if (restLeft <= 0) {
-      clearInterval(restTimer);
-      restStartedAt = null;
-      onRestEnd();
-    }
-  }
-}
-document.addEventListener('visibilitychange', handleVisibilityChange);
-
-function onRestEnd(){
-  playRestEndSound();
-  if(navigator.vibrate) navigator.vibrate([100,50,100,50,100]);
-  cancelRestNotif();
-  setTimeout(()=>{ document.getElementById('rest-overlay').classList.remove('on'); }, 400);
-}
 
 function startRest(nextLabel){
   clearInterval(restTimer);
   restLeft = restTotal;
-  restStartedAt = Date.now();
   updateRestDisplay();
   document.getElementById('rest-next-label').textContent = nextLabel || '';
   document.getElementById('rest-overlay').classList.add('on');
   if(navigator.vibrate) navigator.vibrate(200);
-  scheduleRestNotif(restTotal, nextLabel);
   restTimer = setInterval(()=>{
     restLeft--;
     updateRestDisplay();
     if(restLeft <= 0){
       clearInterval(restTimer);
-      restStartedAt = null;
-      onRestEnd();
+      if(navigator.vibrate) navigator.vibrate([100,50,100]);
+      setTimeout(()=>{ document.getElementById('rest-overlay').classList.remove('on'); }, 400);
     }
   }, 1000);
 }
@@ -291,64 +230,34 @@ function updateRestDisplay(){
   const pct = restLeft / restTotal;
   const offset = REST_CIRC * (1 - pct);
   document.getElementById('rest-arc').style.strokeDashoffset = offset;
-  // Update preset active state (including custom)
-  document.querySelectorAll('.rest-preset').forEach(b => {
-    const val = parseInt(b.dataset.secs || b.textContent);
-    b.classList.toggle('active', val === restTotal);
+  document.querySelectorAll('.rest-preset').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.textContent) === restTotal || (b.textContent==='2min'&&restTotal===120) || (b.textContent==='3min'&&restTotal===180));
   });
-  // Sync custom  if exists
-  const ci = document.getElementById('rest-custom-');
-  if (ci && document.activeElement !== ci) ci.value = restTotal;
 }
 
 function setRestTime(secs){
-  secs = Math.max(5, Math.min(secs, 600));
   restTotal = secs;
   restLeft = secs;
-  restStartedAt = Date.now();
   clearInterval(restTimer);
-  cancelRestNotif();
   updateRestDisplay();
-  // Reschedule notification for new time
-  const label = document.getElementById('rest-next-label')?.textContent || '';
-  scheduleRestNotif(secs, label);
   restTimer = setInterval(()=>{
     restLeft--;
     updateRestDisplay();
     if(restLeft <= 0){
       clearInterval(restTimer);
-      restStartedAt = null;
-      onRestEnd();
+      if(navigator.vibrate) navigator.vibrate([100,50,100]);
+      setTimeout(()=>{ document.getElementById('rest-overlay').classList.remove('on'); }, 400);
     }
   }, 1000);
-}
-
-function setRestTimeFromInput(){
-  const ci = document.getElementById('rest-custom-input');
-  if (!ci) return;
-  const raw = ci.value.trim();
-  if (raw === '') return;
-  let val = parseInt(raw);
-  if (isNaN(val) || val <= 15) { ci.value = restTotal; return; }
-  if (val < 15) val = val * 60;
-  val = Math.min(val, 600);
-  ci.value = val;
-  setRestTime(val);
 }
 
 function addRestTime(secs){
   restLeft = Math.min(restLeft + secs, 600);
   restTotal = Math.max(restTotal, restLeft);
-  restStartedAt = Date.now() - ((restTotal - restLeft) * 1000);
-  cancelRestNotif();
-  const label = document.getElementById('rest-next-label')?.textContent || '';
-  scheduleRestNotif(restLeft, label);
   updateRestDisplay();
 }
 
 function skipRest(){
   clearInterval(restTimer);
-  cancelRestNotif();
-  restStartedAt = null;
   document.getElementById('rest-overlay').classList.remove('on');
 }

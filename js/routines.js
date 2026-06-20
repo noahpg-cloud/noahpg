@@ -166,10 +166,14 @@ function addExToRoutine(){
 function renderRoutineForm(){
   document.getElementById('rut-exercises-wrap').innerHTML = rutineExercises.map((ex,i)=>`
     <div class="card" style="margin-top:10px;padding:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
         <input type="text" placeholder="Nombre del ejercicio" value="${ex.name}" style="flex:1" onchange="rutineExercises[${i}].name=this.value">
         <button class="btn xs ghost" onclick="rutineExercises.splice(${i},1);renderRoutineForm()"><i class="ti ti-trash"></i></button>
       </div>
+      <input type="text" placeholder="⚙️ Config. máquina (asiento, apoyo...) — opcional"
+        value="${ex.machineConfig||''}"
+        style="font-size:12px;color:var(--t2);margin-bottom:8px"
+        onchange="rutineExercises[${i}].machineConfig=this.value">
       <div style="display:grid;grid-template-columns:16px 1fr 1fr 28px;gap:6px;align-items:center;margin-bottom:4px">
         <span style="font-size:10px;color:var(--t3)">#</span>
         <span style="font-size:10px;color:var(--t3);text-align:center">kg</span>
